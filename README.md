@@ -49,7 +49,7 @@ Now let's see some basic math with them:
 >>> poli = Polinomial.from_string('3x + 7y -4')
 >>> poli * 2
 +14y +6x -8
->>> from Core.simples import y
+>>> from Core.simples import x, y
 >>> eq = poli - 7*y
 >>> eq
 +3x -4
@@ -60,4 +60,30 @@ Now let's see some basic math with them:
 ### Factorizzation of a polinomial:
 As all us know, polinomials can be also be factorized:
 ``` python
+>>> first_factor, second_factor = (x**2 + 4*x + 4).scompone()
+>>> first_factor
++x +2
+>>> second_factor 
++x +2
+>>> first_factor * second_factor
++x² +4x +4
+```
+We can also scompone more complex polinomials such as "x² -3x -3":
+``` python
+>>> first_factor, second_factor = (x**2 - 3*x -3).scompone()
+>>> first_factor
++2x -3 -1²√21
+>>> second_factor
++2x -3 +²√21
+```
+
+### Radicals:
+When we have to manage numbers under root, we need the Radical object:
+``` python
+>>> from Core import Radical
+>>> radical = Radical(3)
+>>> radical
+²√3
+>>> radical.to_number()
+1.7320508075688772
 ```

@@ -86,4 +86,7 @@ When we have to manage numbers under root, we need the Radical object:
 ²√3
 >>> radical.to_number()
 1.7320508075688772
+>>> radical = Radical(6) * Radical(2)
+>>> radical
+2²√3
 ```

@@ -116,8 +116,19 @@ As we can see this polinomial isn't reduced, we can search if there is a common 
 ### Find common factors:
 There is a function called 'factors' that finds common factors between items:
 ``` python
->>> from Core import Unknow, Integer, Polinomial, factors
+>>> from Core import factors
+>>> from Core.simples import x, y
 >>>
 >>> factors(33, 27)
 [1, 3]
+>>> factors(15*x, 3*x)
+[<Core.types.Unknow object at 0x01886598>, <Core.types.Unknow object at 0x01886FD0>, 1, 3]
+
+>>> for i in factors(15*x, 3*x):
+...   print(i, end=', ')
+x, 3x, 1, 3,
+ 
+>>> for i in factors(12*x*y**2, 3*x*y):
+...   print(i, end=', ')
+1, 3, x, 1xy, y, 3x, 3xy, 3y,
 ```

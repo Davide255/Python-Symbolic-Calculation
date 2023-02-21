@@ -67,7 +67,7 @@ The Integer class allows us to see numbers as multiplication of prime numbers:
 [5, 13]
 ```
 
-### Factorizzation of a polinomial:
+### Factorizzation of polinomials:
 As all us know, polinomials can be also be factorized:
 ``` python
 >>> first_factor, second_factor = (x**2 + 4*x + 4).scompone()
@@ -95,6 +95,15 @@ As we can see this polinomial isn't reduced, we can search if there is a common 
 4
 >>> mult / mult.mcd()
 +x² -3x -3
+```
+
+### Find common factors:
+There is a function called 'factors' that finds common factors between items:
+``` python
+>>> from Core import Unknow, Integer, Polinomial, factors
+>>>
+>>> factors(33, 27)
+[1, 3]
 ```
 
 ### Radicals:

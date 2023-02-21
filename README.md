@@ -57,6 +57,16 @@ Now let's see some basic math with them:
 >>> Equation(eq, 0).solve()
 4/3
 ```
+### Factorizzation of numbers:
+The Integer class allows us to see numbers as multiplication of prime numbers:
+``` python
+>>> from Core import Integer
+>>> Integer.factorize(12)
+[2, 2, 3]
+>>> Integer(65).factorize()
+[5, 13]
+```
+
 ### Factorizzation of a polinomial:
 As all us know, polinomials can be also be factorized:
 ``` python
@@ -75,6 +85,16 @@ We can also scompone more complex polinomials such as "x² -3x -3":
 +2x -3 -1²√21
 >>> second_factor
 +2x -3 +²√21
+>>> first_factor * second_factor
++4x² -12x -12
+```
+As we can see this polinomial isn't reduced, we can search if there is a common divisor between it's terms:
+``` python
+>>> mult = first_factor * second_factor
+>>> mult.mcd()
+4
+>>> mult / mult.mcd()
++x² -3x -3
 ```
 
 ### Radicals:

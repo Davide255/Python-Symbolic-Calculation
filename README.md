@@ -57,6 +57,22 @@ Now let's see some basic math with them:
 >>> Equation(eq, 0).solve()
 4/3
 ```
+
+### Radicals:
+When we have to manage numbers under root, we need the Radical object:
+``` python
+>>> from Core import Radical
+>>> radical = Radical(3)
+>>> radical
+²√3
+>>> radical.to_number()
+1.7320508075688772
+>>> radical = Radical(6) * Radical(2)
+>>> radical
+2²√3
+```
+
+
 ### Factorizzation of numbers:
 The Integer class allows us to see numbers as multiplication of prime numbers:
 ``` python
@@ -104,18 +120,4 @@ There is a function called 'factors' that finds common factors between items:
 >>>
 >>> factors(33, 27)
 [1, 3]
-```
-
-### Radicals:
-When we have to manage numbers under root, we need the Radical object:
-``` python
->>> from Core import Radical
->>> radical = Radical(3)
->>> radical
-²√3
->>> radical.to_number()
-1.7320508075688772
->>> radical = Radical(6) * Radical(2)
->>> radical
-2²√3
 ```

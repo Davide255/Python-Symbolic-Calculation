@@ -27,7 +27,6 @@ def factors(obj1: Union[Polinomial, Unknow, Literal, Integer, int], *objs: Union
             return [Unknow([1, l.symbol, i]) for i in range(1, l.esponent+1)]
         def _radical_factors(r: Radical):
             return [Radical(i, r.index) for i in factors(r.base)]
-        
         if isinstance(item, (int, Integer)): return _number_factors(item)
         elif isinstance(item, (Unknow, Literal)):
             out = []
@@ -68,7 +67,7 @@ def factors(obj1: Union[Polinomial, Unknow, Literal, Integer, int], *objs: Union
             return out
 
     if isinstance(obj1, Polinomial):
-        return factors(*[t for t in obj1])
+        return factors(*[t for t in obj1], *objs)
     else:
         if not objs: objs = []
         _count = len(objs) + 1
@@ -249,7 +248,8 @@ class Radical(object):
         value: Union[Unknow, Literal, LiteralFraction, int, float, Integer, Polinomial, 
                      List[Union[Unknow, Literal, LiteralFraction, int, float, Integer, Polinomial]]], 
         index: int = 2,
-        coefficient: int = 1) -> None:
+        coefficient: int = 1,
+        _avoid_semplification=False) -> None:
 
         self = super(Radical, cls).__new__(cls)
 
@@ -277,7 +277,7 @@ class Radical(object):
         
         if isinstance(self.base, (Integer, int, float, Fraction)) and (self.base ** (1/self.index)).is_integer():
             return Integer(int(self.base ** (1/self.index)))
-        else: return self.semplify()
+        else: return self.semplify() if not _avoid_semplification else self
 
     def semplify(self):
         esp = 1
@@ -317,16 +317,16 @@ class Radical(object):
                     if len(out) > 0:                
                         num = 1 if num == -1 else num
                         for i in out:
-                            num *= i.number
+                            num *= i
 
                     if len(rin) > 0:
                         nin = 1 if nin == -1 else nin
                         for i in rin:
-                            nin *= i.number
+                            nin *= i
                     else: nin = base.coefficient if not isinstance(base, (int, Integer)) else int(base)
 
                 if num != -1:
-                    return Radical([num, nin, self.index])
+                    return Radical([num, nin, self.index], _avoid_semplification=True)
                 else: return self
 
         elif isinstance(self.base, (Unknow, Literal)):
@@ -371,16 +371,16 @@ class Radical(object):
                     if (num != -1 and abs(nin) == 1) or self.base.coefficient == 1:
                         return Unknow([abs(num), self.base.symbol, int(self.base.esponent / self.index)])
                     else: 
-                        return Radical([Unknow([abs(num), self.base.symbol, int(self.base.esponent / self.index)]), nin, self.index])
+                        return Radical([Unknow([abs(num), self.base.symbol, int(self.base.esponent / self.index)]), nin, self.index], _avoid_semplification=True)
                 elif self.base.esponent > self.index:
                     esp = self.base.esponent
                     newesp = 0
                     while esp >= self.index:
                         esp -= self.index
                         newesp += 1
-                    return Radical([Unknow([abs(num), self.base.symbol, newesp]), Unknow([nin, self.base.symbol, esp]), self.index])
+                    return Radical([Unknow([abs(num), self.base.symbol, newesp]), Unknow([nin, self.base.symbol, esp]), self.index], _avoid_semplification=True)
                 else: 
-                    return Radical([Integer(abs(num)), Unknow([nin, self.base.symbol, self.base.esponent]), self.index])
+                    return Radical([Integer(abs(num)), Unknow([nin, self.base.symbol, self.base.esponent]), self.index], _avoid_semplification=True)
             else: return self
         elif isinstance(self.base, Radical):
             return Radical([self.base.coefficient, self.base.base, self.index * self.base.index])
@@ -414,9 +414,9 @@ class Radical(object):
 
     def __str__(self) -> str:
         if not isinstance(self.base, Polinomial):
-            return '{}{}{}{}'.format(self.coefficient if self.coefficient != 1 else '', apex(self.index), SQRT_SYMBOL, self.base)
+            return '{}{}{}{}'.format(str(self.coefficient).replace('1',''), apex(self.index), SQRT_SYMBOL, self.base)
         else: 
-            return '{}{}{}({})'.format(self.coefficient if self.coefficient != 1 else '', apex(self.index), SQRT_SYMBOL, self.base)
+            return '{}{}{}({})'.format(str(self.coefficient).replace('1',''), apex(self.index), SQRT_SYMBOL, self.base)
 
     def to_number(self):
         if isinstance(self.base, (Integer, int)): return int(self.base) ** (1/self.index)
@@ -471,10 +471,13 @@ class Radical(object):
         return self * value
 
     def __truediv__(self, value):
-        if isinstance(value, (Integer, int, float, Fraction, LiteralFraction)):
-            return Radical([self.coefficient / value, self.base, self.index])
-        elif isinstance(value, (Unknow, Literal)):
-            return Unknow([Radical(self.coefficient / value.coefficient, self.base, self.index), value.symbol, value.esponent])
+        if isinstance(value, (Integer, int, float, Fraction)):
+            return Radical(
+                [int(self.coefficient / value) if (self.coefficient / value).is_integer() 
+                 else LiteralFraction(self.coefficient, value), 
+                 self.base, self.index])
+        elif isinstance(value, (Unknow, Literal, Polinomial)):
+            return LiteralFraction(self, value)
         elif isinstance(value, Radical):
             if self.base == value.base and self.index == value.index:
                 return self.coefficient / value.coefficient
@@ -483,8 +486,7 @@ class Radical(object):
             elif self.base == value.base:
                 return Radical([self.coefficient / value.coefficient, self.base, self.index - value.index])
             else: return LiteralFraction(self, value)
-        elif isinstance(value, Polinomial):
-            return value / self
+
 
     def __rtruediv__(self, value):
         return LiteralFraction(value, self)
@@ -619,8 +621,15 @@ class UnknownMultiplication(object):
     literals = None
     coefficient = None
 
-    def __init__(self, *literals, coefficient_mult=1) -> None:
-        self.literals = literals
+    def __new__(cls, *literals, coefficient_mult=1) -> None:
+
+        self = super(UnknownMultiplication, cls).__new__(cls)
+
+        ref = {}
+        for l in literals:
+            if ref.get(l.symbol): ref[l.symbol] = ref[l.symbol] * l
+            else: ref[l.symbol] = l
+        self.literals = list(ref.values())
 
         for i in literals:
             if self.coefficient: self.coefficient = self.coefficient * i.coefficient
@@ -628,10 +637,13 @@ class UnknownMultiplication(object):
 
         self.coefficient *= coefficient_mult
 
-    def literal_part(self) -> str:
-        fstr = ''
+        return self
+
+    def literal_part(self) -> List[str]:
+        fstr = []
         for i in self.literals:
-            fstr += i.symbol
+            fstr.append(i.symbol)
+        fstr.sort()
         return fstr
     
     def __eq__(self, value):
@@ -648,9 +660,9 @@ class UnknownMultiplication(object):
 
     def __str__(self) -> str:
         fstr = ''
-        for i in self:
-            fstr += i.symbol + (apex(i.esponent) if i.esponent !=1 else '')
-        return str(self.coefficient) + fstr
+        for i in self.literal_part():
+            fstr += self[i].symbol + (apex(self[i].esponent) if self[i].esponent !=1 else '')
+        return str(self.coefficient).replace('1','') + fstr
     
     def to_list(self) -> List[Union[int, Unknow]]:
         return self.literals
@@ -673,13 +685,14 @@ class UnknownMultiplication(object):
 
         if isinstance(value, (Integer, int, float, Fraction)):
             return UnknownMultiplication(*self.literals, coefficient_mult=value)
-        if isinstance(value, (Unknow, Literal, LiteralFraction)):
-            new = [i * value for i in self]
-            return Polinomial(terms=new)
+        if isinstance(value, (Unknow, Literal)):
+            return UnknownMultiplication(*self.literals, value)
 
         if isinstance(value, UnknownMultiplication):
-            new = [i * l for l in value.literals for i in self]
-            return Polinomial(terms=new)
+            return UnknownMultiplication(*value.literals,*self.literals)
+        
+        if isinstance(value, LiteralFraction):
+            return value * self
     
     def __truediv__(self, value):
         
@@ -705,6 +718,10 @@ class UnknownMultiplication(object):
 
     def __iter__(self):
         return iter(self.literals)
+
+    def __getitem__(self, key): 
+        for i in self:
+            if i.symbol == key: return i
 
 class Polinomial(object):
 
@@ -1183,9 +1200,16 @@ class Polinomial(object):
         if isinstance(value, str): value = Polinomial.from_string(value)
         
         if isinstance(value, (Integer, int, float, Fraction, LiteralFraction, Unknow, Literal)):
+            if self.mcd() % value == 0:
+                outterms = []
+                for i in self:
+                    outterms.append(i / value)
+                return Polinomial(outterms)
             for i in self.terms:
-                if i % value != 0:
-                    return LiteralFraction(self, value)
+                try:
+                    if i % value != 0:
+                        return LiteralFraction(self, value)
+                except TypeError: return LiteralFraction(self, value)
                 self.terms[self.terms.index(i)] = i / value
             return self
 
@@ -1285,7 +1309,7 @@ class LiteralFraction(object):
     denominator: Union[Polinomial, Unknow, Integer] = None
     literal: bool = False
 
-    def __new__(cls, *args):
+    def __new__(cls, *args, _avoid_semplification=False):
         self = super(LiteralFraction, cls).__new__(cls)
 
         if len(args) == 1 and isinstance(args[0], str): 
@@ -1300,6 +1324,7 @@ class LiteralFraction(object):
             else: self.literal = True
         elif len(args) == 1 and isinstance(args[0], int): return Integer(args[0])
         elif len(args) == 1 and isinstance(args[0], float): return Fraction(args[0])
+        elif len(args) == 1 and isinstance(args[0], LiteralFraction): return args[0]
         elif len(args) == 2:
             if isinstance(args[0], (Integer, int)) and isinstance(args[1], (Integer, int)): return Fraction(int(args[0]), int(args[1])) if not int(args[0]) % int(args[1]) == 0 else int(args[0] / args[1])
             else:
@@ -1313,13 +1338,13 @@ class LiteralFraction(object):
                     isinstance(self.denominator, (Unknow, Literal, Polinomial, Radical)): self.literal = True
                 else: return Fraction(int(self.numerator), int(self.denominator))
 
-        return self.semplify()
+        return self.semplify() if not _avoid_semplification else self
 
     def semplify(self):
         common = factors(self.numerator, self.denominator)
         
         highest = common[0]
-        for i in common[1::]:
+        for i in common[1:]:
             if isinstance(i, (Unknow, Literal)) and isinstance(highest, (Unknow, Literal)):
                 if i.coefficient > highest.coefficient: highest = i
             elif isinstance(i, (Unknow, Literal)) and isinstance(highest, (Integer, int)):
@@ -1329,7 +1354,7 @@ class LiteralFraction(object):
             else:
                 if i > highest: highest = i
 
-        return LiteralFraction(self.numerator / highest, self.denominator / highest) if highest != 1 else self
+        return LiteralFraction(self.numerator / highest, self.denominator / highest, _avoid_semplification=True) if highest != 1 else self
 
     def __neg__(self):
         return LiteralFraction(-self.numerator, self.denominator)
@@ -1410,8 +1435,6 @@ without any parentesis!
             self.first = first
             self.second = second
 
-        Equation.example = property(lambda self: 0, lambda self, value: value)
-
         if isinstance(self.first, Polinomial):
             for i in self.first.literals():
                 exec('setattr(Equation, \'{}\', property(lambda self: self.__getliteral__(\'{}\'), lambda self, value: self.__setliteral__(\'{}\', value)))'.replace('{}', i))
@@ -1450,17 +1473,44 @@ without any parentesis!
             for i in self.first:
                 if isinstance(i, Unknow):
                     uk.append(i)
-                else: num.append(-i)
+                else: num.append(i)
 
             if unknow == None and len(uk) == 1: unknow = uk[0].symbol
-            else: return (Polinomial(uk), Polinomial(num))
+            elif len(uk) == 2 and uk[0].symbol == uk[1].symbol and len(num) == 1:
+                if (uk[0].esponent+1 == uk[1].esponent):
+                    pa = uk[1]
+                    pb = uk[0]
+                else:
+                    pa = uk[0]
+                    pb = uk[1]
+                pc = num[0]
+
+                a = Integer(pa.coefficient)
+                b = Integer(pb.coefficient)
+
+                delta = b**2 - 4*a*pc
+                if delta > 0:
+                    _rad = Radical(delta)
+                    solutions = [LiteralFraction((_rad -b),(2*a)),
+                                 LiteralFraction((-b -_rad),(2*a))]
+
+                    f = Equation(Unknow('x')*solutions[0].denominator - solutions[0].numerator, 0).solve()
+                    s = Equation(Unknow('x')*solutions[1].denominator - solutions[1].numerator, 0).solve()
+
+                    return (f, s)
+                elif delta == 0:
+                    rv = Equation(Radical(pa)+ Radical(pc), 0).solve()
+                    return (rv, rv)
+                else:
+                    raise NotImplementedError('Cannot get the square root of a negative number') 
+            else: return (Polinomial(uk), -Polinomial(num))
 
             for i in uk:
                 if not i.symbol == unknow:
                     num.append(i)
                     uk.remove(i)
 
-            return Polinomial(num)/uk[0].coefficient
+            return LiteralFraction(Polinomial(num)/uk[0].coefficient)
 
 class System(object):
 

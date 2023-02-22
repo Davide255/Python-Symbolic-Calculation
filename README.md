@@ -132,3 +132,16 @@ x, 3x, 1, 3,
 ...   print(i, end=', ')
 1, 3, x, 1xy, y, 3x, 3xy, 3y,
 ```
+
+### Second Degree Equations
+This library can also compute second degree equaitons
+``` python
+>>> from Core.simples import x
+>>> from Core import Equation
+>>> 
+>>> x1, x2 = Equation(x**2 + 4*x +4, 0).solve()
+>>> x1
+2
+>>> x2
+2
+```

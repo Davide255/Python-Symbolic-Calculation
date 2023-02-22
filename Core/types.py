@@ -1,8 +1,8 @@
 from typing import List, Union, Tuple
 from fractions import Fraction
 
-from math import factorial
-from functools import reduce
+from math import factorial as _factorial
+from functools import reduce as _reduce
 
 SQRT_SYMBOL = '√'
 
@@ -16,12 +16,13 @@ class Unknow(object): ...
 class Literal(Unknow): pass
 class Integer(object): ...
 class LiteralFraction(object): ...
+class Equation(object): ...
 
 def factors(obj1: Union[Polinomial, Unknow, Literal, Integer, int], *objs: Union[Polinomial, Unknow, Literal, Integer, int]):
     '''find all common factors between elements, if only one is passed, it returns all his factors'''
     def __factors(item: Union[Unknow, Literal, Integer]):
         def _number_factors(n):
-            return list(set(reduce(list.__add__,
+            return list(set(_reduce(list.__add__,
                         ([i, abs(n)//i] for i in range(1, int(abs(n)**0.5) + 1) if abs(n) % i == 0))))
         def _literal_factors(l: Unknow):
             return [Unknow([1, l.symbol, i]) for i in range(1, l.esponent+1)]
@@ -602,10 +603,9 @@ class Unknow(object):
 
         if isinstance(value, (Unknow, Literal)):
             # Power with letter not implemented
-            return self
+            raise NotImplemented('Power with literals not implemented yet!')
             #return Unknow(self.coefficient ** value.coefficient,)
-
-        if isinstance(value, int):
+        elif isinstance(value, (int, Integer)):
             return Unknow([Integer(self.coefficient, value), self.symbol, self.esponent * value])
 
     def __mod__(self, value):
@@ -626,16 +626,24 @@ class UnknownMultiplication(object):
         self = super(UnknownMultiplication, cls).__new__(cls)
 
         ref = {}
+        _num = 1
         for l in literals:
-            if ref.get(l.symbol): ref[l.symbol] = ref[l.symbol] * l
-            else: ref[l.symbol] = l
+            if not isinstance(l, (int, Fraction, Integer)):
+                if ref.get(l.symbol): ref[l.symbol] = ref[l.symbol] * l
+                else: ref[l.symbol] = l
+            else: _num = _num * l
         self.literals = list(ref.values())
 
-        for i in literals:
-            if self.coefficient: self.coefficient = self.coefficient * i.coefficient
-            else: self.coefficient = i.coefficient
+        if len(self.literals) == 1: return self.literals[0]
+
+        for i in self.literals:
+            if isinstance(i, (int, Integer)):
+                self.literals.remove(i)
+            if self.coefficient: self.coefficient = self.coefficient * (i.coefficient if isinstance(i, (Unknow, Literal)) else i)
+            else: self.coefficient = (i.coefficient if isinstance(i, (Unknow, Literal)) else i)
 
         self.coefficient *= coefficient_mult
+        self.coefficient = self.coefficient * _num
 
         return self
 
@@ -698,16 +706,35 @@ class UnknownMultiplication(object):
         
         if isinstance(value, str): value = Polinomial.from_string(value)
 
-        if isinstance(value, (Unknow, Literal, Integer, int, float, Fraction, LiteralFraction)):
-
+        if isinstance(value, (Integer, int, Fraction)):
+            return UnknownMultiplication(*self.literals, coefficient_mult=LiteralFraction(1, value))
+        
+        elif isinstance(value, (Unknow, Literal)):
+            _lit = []
+            _coeff = value.coefficient
             for i in self:
-                if value / i:
-                    pass
-
-            return LiteralFraction(self, value)
+                if not isinstance(i, (int, Integer, Fraction)):
+                    if i.symbol == value.symbol: _lit.append(i / value)
+                    else: _lit.append(i)
+                else: _coeff = _coeff / i
+            if _coeff.is_integer(): _coeff = int(_coeff)
+            else: _coeff = LiteralFraction(self.coefficient, value.coefficient)
+            return UnknownMultiplication(*_lit, coefficient_mult=_coeff)
 
         if isinstance(value, UnknownMultiplication):
-            return LiteralFraction(self, value)
+            _lit = []
+            _coeff = self.coefficient
+            valuel: dict = {}
+            for i in value.literals:
+                valuel[i.symbol] = i
+            for i in self:
+                if not isinstance(i, (int, Integer)):
+                    if i.symbol in value.literal_part():
+                        _lit.append(i / valuel.pop(i.symbol))
+                    else: _lit.append(i)
+            if len(valuel.values()) == 0:
+                return UnknownMultiplication(*_lit)
+            else: return LiteralFraction(UnknownMultiplication(*_lit, coefficient_mult=self.coefficient), UnknownMultiplication(*valuel.values(), coefficient_mult=value.coefficient))
     
     def __pow__(self, value):
 
@@ -730,6 +757,7 @@ class Polinomial(object):
     def __new__(cls, terms: list = None) -> None:
         self = super(Polinomial, cls).__new__(cls)
 
+        if isinstance(terms, Polinomial): return terms
         self.terms = terms if terms else []
         self.semplify_and_format()
         if len(self.terms) == 1: return self.terms[0]
@@ -929,7 +957,7 @@ class Polinomial(object):
                 if ob1.symbol == ob2.symbol:
                     return Unknow([ob1.coefficient * ob2.coefficient, ob1.symbol, ob1.esponent + ob2.esponent])
                 else:
-                    return Polinomial(terms=[UnknownMultiplication(ob1, ob2)])
+                    return UnknownMultiplication(ob1, ob2)
             elif isinstance(ob2, Radical):
                 return Unknow([ob1.coefficient * ob2, ob1.symbol, ob1.esponent])
                 
@@ -953,9 +981,9 @@ class Polinomial(object):
                 return ob1 / ob2
             if isinstance(ob2, (Unknow, Literal)):
                 if ob1.symbol == ob2.symbol:
-                    return Unknow([Fraction(ob1.coefficient, ob2.coefficient), ob1.symbol, ob1.esponent - ob2.esponent])
+                    return Unknow([LiteralFraction(ob1.coefficient, ob2.coefficient), ob1.symbol, ob1.esponent - ob2.esponent])
                 else:
-                    return LiteralFraction(ob1.symbol, ob2.symbol) * Fraction(ob1.coefficient, ob2.coefficient)
+                    return LiteralFraction(ob1.symbol, ob2.symbol) * LiteralFraction(ob1.coefficient, ob2.coefficient)
 
     def from_string(string: str):
         terms = []
@@ -1037,8 +1065,8 @@ class Polinomial(object):
         
         fout = None
         for f in fractions:
-            if fout: fout = fout + i
-            else: fout = i
+            if fout: fout = fout + f
+            else: fout = f
         self.terms.append(fout) if fout else None
 
         rout = None
@@ -1262,7 +1290,7 @@ class Polinomial(object):
             n = value
             if isinstance(a, (Unknow, Literal)) and isinstance(b, (Unknow, Literal)):
                 for k in range(0, n+1):
-                    coeff = factorial(n) // factorial(k) // factorial(n-k)
+                    coeff = _factorial(n) // _factorial(k) // _factorial(n-k)
                     if k == 0:
                         terms.append(Unknow([coeff, a.symbol, n]))
                     elif k == n:
@@ -1271,21 +1299,21 @@ class Polinomial(object):
                         terms.append(Unknow([coeff, a.symbol, n-k]) * Unknow([1, b.symbol, k]))
             elif isinstance(b, (Unknow, Literal)) and isinstance(a, Integer):
                 for k in range(0, n+1):
-                    coeff = factorial(n) // factorial(k) // factorial(n-k)
+                    coeff = _factorial(n) // _factorial(k) // _factorial(n-k)
                     if k == n:
                         terms.append((a ** k))
                     else:
                         terms.append(Unknow([coeff, b.symbol, n-k]) * (a ** k))
             elif isinstance(a, (Unknow, Literal)) and isinstance(b, Integer):
                 for k in range(0, n+1):
-                    coeff = factorial(n) // factorial(k) // factorial(n-k)
+                    coeff = _factorial(n) // _factorial(k) // _factorial(n-k)
                     if k == n:
                         terms.append((b ** k))
                     else:
                         terms.append(Unknow([coeff, a.symbol, n-k]) * (b ** k))
             else:
                 for k in range(0, n+1):
-                    coeff = factorial(n) // factorial(k) // factorial(n-k)
+                    coeff = _factorial(n) // _factorial(k) // _factorial(n-k)
                     if k == 0:
                         terms.append(a ** n)
                     elif k == n:
@@ -1334,8 +1362,8 @@ class LiteralFraction(object):
                 if self.denominator == 1: return self.numerator
                 elif self.denominator == -1: return -self.numerator
 
-                if isinstance(self.numerator, (Unknow, Literal, Polinomial, Radical)) or \
-                    isinstance(self.denominator, (Unknow, Literal, Polinomial, Radical)): self.literal = True
+                if isinstance(self.numerator, (Unknow, Literal, Polinomial, Radical, UnknownMultiplication)) or \
+                    isinstance(self.denominator, (Unknow, Literal, Polinomial, Radical, UnknownMultiplication)): self.literal = True
                 else: return Fraction(int(self.numerator), int(self.denominator))
 
         return self.semplify() if not _avoid_semplification else self
@@ -1420,13 +1448,16 @@ class Equation(object):
     '''
 Basic Expression Class
 ======================
+Evaluate an expression and find the value of the unknown
 
-It's used for expressions with only sum, subtraction, division and multiplication
-without any parentesis!
+Current Supported:
+ - 1 grade equation
+ - 2 grade equation
 
-    '''
 
-    def __init__(self, first, second) -> None:
+'''
+
+    def __init__(self, first, second = 0) -> None:
         self.first: Polinomial = first -second
         if isinstance(self.first, Polinomial):
             self.first.semplify_and_format()
@@ -1456,7 +1487,10 @@ without any parentesis!
         return '{} = {}'.format(str(self.first), str(self.second)).replace('  ', ' ')
 
     def parse_expr(self, expr: str): #-> #List[Integer, Unknow]:
-        
+        '''Under developement: transform string to equation'''
+
+        raise NotImplemented('Under developement: transform string to equation')
+
         fexpr = expr.replace('+', ' +').replace('-',' -'). replace('=', ' = ').replace('  ', ' ').replace('+ ', '+').replace('- ','-')
 
         parts = fexpr.split(' = ')
@@ -1465,6 +1499,35 @@ without any parentesis!
         sp = Polinomial.from_string(parts[1])
 
         eq = fp-sp
+
+    def _ordinate_equation(self, equation: Union[Polinomial, Equation, List[Unknow]] = None):
+        if not equation: equation = self.first
+        if isinstance(equation, Equation): equation = equation.first
+
+        umap = {}
+
+        for i in equation:
+            if isinstance(i, (Unknow, Literal)):
+                if not i.symbol in umap.keys(): umap[i.symbol] = [i]
+                else: umap[i.symbol].append(i)
+            else: 
+                if not 'others' in umap.keys(): umap['others'] = [i]
+                else: umap['others'].append(i)
+        if 'others' in umap.keys(): others = umap.pop('others')
+        else: others = []
+
+        literals = []
+        for ls in umap.values():
+            bf: Unknow = None
+            for l in ls:
+                if bf:
+                    if bf.esponent > l.esponent: literals.append(l)
+                    else: literals.insert(literals.index(bf), l)
+                else: literals.append(l)
+                bf = l
+
+        literals += others
+        return literals
 
     def solve(self, unknow = None):
         if isinstance(self.first, Polinomial) and Unknow in self.first:
@@ -1475,14 +1538,14 @@ without any parentesis!
                     uk.append(i)
                 else: num.append(i)
 
+            uk = self._ordinate_equation(uk)
+
             if unknow == None and len(uk) == 1: unknow = uk[0].symbol
-            elif len(uk) == 2 and uk[0].symbol == uk[1].symbol and len(num) == 1:
-                if (uk[0].esponent+1 == uk[1].esponent):
-                    pa = uk[1]
-                    pb = uk[0]
-                else:
-                    pa = uk[0]
-                    pb = uk[1]
+            # 2 grade equation
+            elif len(uk) == 2 and uk[0].symbol == uk[1].symbol \
+                and (uk[0].esponent == 2 and uk[1].esponent == 1) and len(num) == 1:
+                pa = uk[0]
+                pb = uk[1]
                 pc = num[0]
 
                 a = Integer(pa.coefficient)
@@ -1502,7 +1565,40 @@ without any parentesis!
                     rv = Equation(Radical(pa)+ Radical(pc), 0).solve()
                     return (rv, rv)
                 else:
-                    raise NotImplementedError('Cannot get the square root of a negative number') 
+                    raise NotImplementedError('Cannot get the square root of a negative number')
+
+            # 3 grade equation
+            elif len(uk) == 3 and uk[0].symbol == uk[1].symbol == uk[2].symbol and\
+                uk[0].esponent == 3 and uk[1].esponent == 2 and uk[2].esponent == 1:
+                pa, pb, pc = uk
+                pd = Polinomial(num)
+
+                a = pa.coefficient
+                b = pb.coefficient
+                c = pc.coefficient
+
+                d0 = b**2 - 3*a*c
+                d1 = 2*b**3 - 9*a*b*c + 27*pd*a**2
+
+                if d0 == d1 == 0:
+                    rv: Polinomial = Polinomial(3*a*Unknow(pa.symbol) + b)
+                    rv = rv / rv.mcd()
+                    return (rv,rv,rv)
+                else:
+                    raise NotImplementedError(
+'''This third degree equation cannot be solved yet because of the forumula that require complex numbers!''')
+
+                C0 = Radical((d1 + Radical(d1**2 - 4*d0**3))/2, 3)
+                C1 = Radical()
+
+                F = (-1 + Radical(-3))/2
+
+                results = []
+                for k in range(3):
+                    
+                    pass
+                return tuple(results)
+
             else: return (Polinomial(uk), -Polinomial(num))
 
             for i in uk:
@@ -1511,6 +1607,8 @@ without any parentesis!
                     uk.remove(i)
 
             return LiteralFraction(Polinomial(num)/uk[0].coefficient)
+        
+        else: return self.first
 
 class System(object):
 

@@ -162,19 +162,19 @@ class Integer(object):
         return Integer(-self.number, self.esponent)
     
     def __abs__(self):
-        return abs(self.number ** self.esponent)
+        return abs(int(self))
     
     def __radd__(self, value):
-        return value.__add__(self.number ** self.esponent)
+        return value.__add__(int(self))
     
     def __rsub__(self, value):
-        return value.__add__(-(self.number ** self.esponent))
+        return value.__add__(-int(self))
     
     def __rmul__(self, value):
-        return value.__mul__(self.number ** self.esponent)
+        return value.__mul__(int(self))
     
     def __rtruediv__(self, value):
-        return Fraction(value, self.number ** self.esponent)
+        return Fraction(value, int(self))
 
     def __add__(self, value):
         if isinstance(value, (Unknow, Literal)):
@@ -183,6 +183,8 @@ class Integer(object):
             return Polinomial(terms=[value, self])
         elif isinstance(value, Integer):
             return Integer((self.number**self.esponent) + (value.number**value.esponent))
+        elif isinstance(value, Fraction):
+            return value.__add__(int(self))
         else:
             return self.number.__add__(value)
 
@@ -193,6 +195,8 @@ class Integer(object):
             return Polinomial(terms=[-value, self])
         elif isinstance(value, Integer):
             return Integer((self.number**self.esponent) - (value.number**value.esponent))
+        elif isinstance(value, Fraction):
+            return -value.__add__(-int(self))
         else:
             return self.number.__sub__(value)
 
@@ -331,10 +335,10 @@ class Radical(object):
                         nin = 1 if nin == -1 else nin
                         for i in rin:
                             nin *= i
-                    else: nin = base.coefficient if not isinstance(base, (int, Integer)) else int(base)
+                    else: nin = 1
 
                 if num != -1:
-                    return Radical([num, nin, self.index], _avoid_semplification=True)
+                    return Radical([num * self.coefficient, nin, self.index], _avoid_semplification=True)
                 else: return self
 
         elif isinstance(self.base, (Unknow, Literal)):

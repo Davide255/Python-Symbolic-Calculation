@@ -11,15 +11,84 @@ class Trinomial: pass
 class Quadrinomial: pass
 
 class Polinomial(object): ...
+class UnknownMultiplication(object): ...
+class PolinomialMultiplication(object): ...
 class Literal(object): ... 
 class Unknow(object): ...
 class Literal(Unknow): pass
+class Radical(object): ...
 class Integer(object): ...
 class LiteralFraction(object): ...
 class Equation(object): ...
 
-def factors(obj1: Union[Polinomial, Unknow, Literal, Integer, int], *objs: Union[Polinomial, Unknow, Literal, Integer, int]):
+def MCM(*items: Union[Polinomial, Unknow, Literal, Integer, int]):
+    
+    _all = []
+    _ref = {}
+    for i in items:
+        if isinstance(i, (int, Integer)):
+            _ref[str(i)] = Integer.factorize(i)
+            _all += _ref[str(i)]
+        elif isinstance(i, Polinomial):
+            _ref[str(i)] = list(i.scompone())
+            _all += _ref[str(i)]
+        elif isinstance(i, PolinomialMultiplication):
+            _ref[str(i)] = list(i)
+            _all += _ref[str(i)]
+
+    def _highest(item, ref: dict):
+        rv = 0
+        for i in ref.values():
+            if i.count(item) > rv:
+                rv = i.count(item)
+        return item ** rv
+
+    _processed = []
+    out = 1
+    for i in _all:
+        if not i in _processed:
+            out = out * _highest(i, _ref)
+            _processed.append(i)
+
+    return out
+
+def MCD(*items: Union[Polinomial, Unknow, Literal, Integer, int]):
+    
+    _all = []
+    _ref = {}
+    for i in items:
+        if isinstance(i, (int, Integer)):
+            _ref[str(i)] = Integer.factorize(i)
+            _all += _ref[str(i)]
+        elif isinstance(i, Polinomial):
+            _ref[str(i)] = list(i.scompone())
+            _all += _ref[str(i)]
+
+    def _lowest(item, ref: dict):
+        rv = None
+        for i in ref.values():
+            _c = i.count(item)
+            if not rv: rv = _c
+            if _c > 0 and _c < rv:
+                rv = i.count(item)
+            elif _c == 0: 
+                return 1
+        return item ** rv
+
+    _processed = []
+    out = 1
+    for i in _all:
+        if not i in _processed:
+            out = out * _lowest(i, _ref)
+            _processed.append(i)
+
+    return out
+
+def factors(*objects: Union[Polinomial, Unknow, Literal, LiteralFraction, Fraction, Radical, Integer, int]):
     '''find all common factors between elements, if only one is passed, it returns all his factors'''
+    
+    class FactorList(list): pass
+    
     def __factors(item: Union[Unknow, Literal, Integer]):
         def _number_factors(n):
             return list(set(_reduce(list.__add__,
@@ -28,6 +97,7 @@ def factors(obj1: Union[Polinomial, Unknow, Literal, Integer, int], *objs: Union
             return [Unknow([1, l.symbol, i]) for i in range(1, l.esponent+1)]
         def _radical_factors(r: Radical):
             return [Radical(i, r.index) for i in factors(r.base)]
+        
         if isinstance(item, (int, Integer)): return _number_factors(item)
         elif isinstance(item, (Unknow, Literal)):
             out = []
@@ -70,19 +140,69 @@ def factors(obj1: Union[Polinomial, Unknow, Literal, Integer, int], *objs: Union
             out = __factors(item.numerator)
             out += [LiteralFraction(1, d, _avoid_semplification=True) for d in __factors(item.denominator)]
             return out
+        elif isinstance(item, FactorList): return list(item)
 
-    if isinstance(obj1, Polinomial):
-        return factors(*[t for t in obj1], *objs)
-    else:
-        if not objs: objs = []
-        _count = len(objs) + 1
-        _factors = []
-        for i in (obj1, *objs): _factors += __factors(i)
-        out = []
-        for f in _factors:
-            if _factors.count(f) >= _count and not f in out: 
-                out.append(f)
-        return out
+    def __polinomial_factors(*items: Union[Polinomial, PolinomialMultiplication]):
+        count = len(items)
+
+        ordered_list: List[Polinomial] = []
+        for i in items:
+            if not isinstance(i, PolinomialMultiplication):
+                ordered_list.append(i)
+            else: 
+                ordered_list += i.polinomials
+                ordered_list.append(i.coefficient)
+
+        _factors = [1]
+        _same_base = {}
+        while len(ordered_list) != 0:
+            for i in ordered_list:
+                ordered_list.remove(i)
+                if isinstance(i, Polinomial):
+                    _to_remove = []
+                    for p in ordered_list:
+                        if isinstance(p, Polinomial) and p.terms == i.terms:
+                            key = str(Polinomial(*p.terms))
+                            if not _same_base.get(key):
+                                _same_base[key] = []
+                            if p.esponent > i.esponent:
+                                _same_base[key].append(i)
+                            else: _same_base[key].append(p)
+                            _to_remove.append(p)
+                    for tr in _to_remove: ordered_list.remove(tr)
+                elif ordered_list.count(i) >= count:
+                    _factors.append(i)
+            
+        for i in _same_base.values():
+            if len(i) == count-1:
+                _lowest = i[0]
+                for p in i[1:]:
+                    if p.esponent < _lowest.esponent:
+                        _lowest = p
+                _factors.append(_lowest)
+
+        return _factors
+
+    objs = list(objects)
+
+    for i in objects:
+        if isinstance(i, Polinomial):
+            objs[objs.index(i)] = FactorList(factors(*[t for t in i]))
+        elif isinstance(i, PolinomialMultiplication):
+            return __polinomial_factors(*objects)
+        elif isinstance(i, (tuple, list)):
+            objs.remove(i)
+            for tf in i: objs.append(FactorList(__factors(tf)))
+    
+    _count = len(objs)
+    _factors = []
+    for i in objs: _factors += __factors(i)
+    out = []
+    for f in _factors:
+        if _factors.count(f) >= _count and not f in out: 
+            out.append(f)
+
+    return out if out != [] else [1]
 
 def apex(number: Union[int, Integer]):
     _apexs = {
@@ -141,6 +261,9 @@ class Integer(object):
         return factors
     
     def __eq__(self, value) -> bool:
+        if isinstance(value, Integer):
+            if self.esponent == value.esponent and self.number == value.number: return True
+            else: return False
         return int(self).__eq__(value)
     
     def __lt__(self, value):
@@ -565,6 +688,30 @@ class Unknow(object):
 
     def __abs__(self): return Unknow([abs(self.coefficient), self.symbol, self.esponent])
 
+    def __lt__(self, value):
+        if isinstance(value, (int, Integer)):
+            return False
+        elif isinstance(value, (Unknow, Literal)):
+            if self.symbol == value.symbol and self.esponent == value.esponent:
+                return self.coefficient < value.coefficient
+            else: return None
+        else: return None
+    
+    def __gt__(self, value):
+        if isinstance(value, (int, Integer)):
+            return True
+        elif isinstance(value, (Unknow, Literal)):
+            if self.symbol == value.symbol and self.esponent == value.esponent:
+                return self.coefficient > value.coefficient
+            else: return None
+        else: return None
+
+    def __mod__(self, value):
+        return self.coefficient % value
+    
+    def __rmod__(self, value):
+        return value % self.coefficient
+
     def __add__(self, value):
         return Polinomial.from_sum(self, value)
     
@@ -631,6 +778,9 @@ class Unknow(object):
     def __str__(self) -> str:
         return '{}{}{}'.format(str(self.coefficient) if abs(self.coefficient) != 1 else ('-' if self.coefficient < 0 else ''), self.symbol, apex(self.esponent) if self.esponent != 1 else '')
 
+    def __repr__(self) -> str:
+        return '<Unknow: ' + str(self) + '>'
+
 class UnknownMultiplication(object):
 
     literals = None
@@ -649,7 +799,7 @@ class UnknownMultiplication(object):
             else: _num = _num * l
         self.literals = list(ref.values())
 
-        if len(self.literals) == 1: return self.literals[0]
+        if len(self.literals) == 1: return self.literals[0] * coefficient_mult
 
         for i in self.literals:
             if isinstance(i, (int, Integer)):
@@ -697,10 +847,10 @@ class UnknownMultiplication(object):
         return Polinomial(terms=[self, value])
 
     def __sub__(self, value):
-        return Polinomial(terms=[self, value])
+        return Polinomial(terms=[self, -value])
     
     def __rsub__(self, value):
-        return Polinomial(terms=[self, -value])
+        return -Polinomial(terms=[self, -value])
 
     def __mul__(self, value):
         
@@ -726,13 +876,14 @@ class UnknownMultiplication(object):
         
         elif isinstance(value, (Unknow, Literal)):
             _lit = []
-            _coeff = value.coefficient
+            _coeff = LiteralFraction(self.coefficient, value.coefficient)
             for i in self:
                 if not isinstance(i, (int, Integer, Fraction)):
-                    if i.symbol == value.symbol: _lit.append(i / value)
-                    else: _lit.append(i)
+                    if i.symbol == value.symbol: 
+                        _lit.append((i/i.coefficient) / (value/value.coefficient))
+                    else: _lit.append(i/i.coefficient)
                 else: _coeff = _coeff / i
-            if _coeff.is_integer(): _coeff = int(_coeff)
+            if isinstance(_coeff, int) or _coeff.is_integer(): _coeff = int(_coeff)
             else: _coeff = LiteralFraction(self.coefficient, value.coefficient)
             return UnknownMultiplication(*_lit, coefficient_mult=_coeff)
 
@@ -768,20 +919,21 @@ class UnknownMultiplication(object):
 class Polinomial(object):
 
     terms: List[Union[Polinomial, Tuple[Union[int, str]]]] = None
+    esponent: int = 1
     
-    def __new__(cls, terms: list = None) -> None:
+    def __new__(cls, *items, terms: list = [], esponent=1) -> None:
         self = super(Polinomial, cls).__new__(cls)
-
-        if isinstance(terms, Polinomial): return terms
-        self.terms = terms if terms else []
-        self.semplify_and_format()
+        self.esponent = esponent
+        if esponent == 0: return Integer(1)
+        if not isinstance(terms, (list, tuple)): return terms
+        self.terms = list(terms) + list(items)
         if len(self.terms) == 1: return self.terms[0]
-        else: return self
+        else: return self.semplify_and_format()
 
     def __str__(self) -> str:
-        self.semplify_and_format()
+        _self = Equation(0)._ordinate_equation(self)
         fstr = ''
-        for i in self.terms:
+        for i in _self:
             if isinstance(i, (list,tuple)):
                 e = str(i[0]) + i[1].symbol + i[2].symbol
                 e = '+'+e if not e.startswith('-') else e
@@ -789,8 +941,15 @@ class Polinomial(object):
             else: fstr += '+'+str(i) if not str(i).startswith('-') else str(i)
 
             fstr += ' '
-        return fstr.replace('++', '+').replace('  ', ' ')[:-1]
+        fstr = fstr.replace('++', '+').replace('  ', ' ')[:-1]
     
+        if self.esponent != 1:
+            return '(' + fstr + ')' + apex(self.esponent)
+        else: return fstr
+
+    def __repr__(self) -> str:
+        return '<Polinomial: '+str(self)+'>'
+
     def __abs__(self): return self
 
     def __getitem__(self, key): return self.terms.__getitem__(key)
@@ -804,33 +963,41 @@ class Polinomial(object):
     def scompone(self, poly: Polinomial = None):
 
         if isinstance(poly, str): poly = Polinomial.from_string(poly)
-        if not poly: poly = Polinomial(terms=self.terms.copy())
+        if not poly: poly = Polinomial(terms=self.terms.copy(), esponent=self.esponent)
+        if poly.esponent != 1: return poly
+
+        ord_poly = Equation(0)._ordinate_equation(poly)
         
         if poly == Trinomial:
-            pa = poly[0]
-            pb = poly[1]
-            pc = poly[2]
+            pa, pb, *pc = ord_poly
+            pc = sum(pc)
 
             # 2 grade trinomial
             if pa.esponent == 2 and \
                 pb.symbol == pa.symbol and \
                 pb.esponent == 1 and not isinstance(pc, (Unknow, Literal, LiteralFraction)):
 
-                a = Integer(pa.coefficient)
-                b = Integer(pb.coefficient)
+                a = pa.coefficient
+                b = pb.coefficient
                 
                 delta = b ** 2 - 4*a*pc
                 if delta > 0:
                     _rad = Radical(delta)
-                    solutions = [LiteralFraction((_rad -b),(2*a)),
-                                 LiteralFraction((-b -_rad),(2*a))]
-                    f = (Unknow('x')*solutions[0].denominator - solutions[0].numerator)
-                    s = (Unknow('x')*solutions[1].denominator - solutions[1].numerator)
+                    solutions = [LiteralFraction((-b + _rad),(2*a)),
+                                 LiteralFraction((-b - _rad),(2*a))]
+                    
+                    if isinstance(solutions[1], (Fraction, LiteralFraction)):
+                        f = (Unknow(pa.symbol)*solutions[0].denominator - solutions[0].numerator)
+                    else: f = (Unknow(pa.symbol) - solutions[0])
+                    if isinstance(solutions[1], (Fraction, LiteralFraction)):
+                        s = (Unknow(pa.symbol)*solutions[1].denominator - solutions[1].numerator)
+                    else: s = (Unknow(pa.symbol) - solutions[1])
 
-                    return (f, s)
+                    return PolinomialMultiplication(f, s)
+
                 elif delta == 0:
                     rv = Radical(pa)+ Radical(pc)
-                    return (rv,rv)
+                    return PolinomialMultiplication(rv,rv)
                 else:
                     raise NotImplementedError('Cannot get the square root of a negative number')
             
@@ -859,7 +1026,7 @@ class Polinomial(object):
                         rv = Radical(tgrade[1], 3) - Radical(tgrade[0], 3)
                     elif (fv < 0) and (sv < 0):
                         rv = - Radical(tgrade[0], 3) - Radical(tgrade[1], 3)
-                    return (rv, rv)
+                    return PolinomialMultiplication(rv, rv)
                 
         elif poly == Binomial:
             f = poly[0]
@@ -871,7 +1038,7 @@ class Polinomial(object):
             if not isinstance(a, Radical) and (s.coefficient if isinstance(s, (Unknow, Literal)) else s.number) < 0:
                 b = Radical(abs(s))
                 if not isinstance(b, Radical):
-                    return ((a +b), (a -b))
+                    return PolinomialMultiplication((a +b), (a -b))
             
             # subtraction of cubes
             a = Radical(f, 3)
@@ -879,11 +1046,15 @@ class Polinomial(object):
                 b = Radical(abs(s), 3)
                 if not isinstance(b, Radical):
                     if (s.coefficient if isinstance(s, (Unknow, Literal)) else s.number) < 0: # positive
-                        return ((a - b),((a**2) + a*b +(b**2))) 
+                        return PolinomialMultiplication((a - b),((a**2) + a*b +(b**2))) 
                     else: # negative
-                        return ((a + b),((a**2) - a*b +(b**2)))
-                
-        return (poly, 1)
+                        return PolinomialMultiplication((a + b),((a**2) - a*b +(b**2)))
+        
+        commonfactors = factors(poly)
+        d = 0
+        for f in commonfactors:
+            if f > d: d = f
+        return PolinomialMultiplication(poly / d, coefficient=d)
 
     def get_term_from_grade(self, grade, letter=None, ensure_success=False):
         for i in self:
@@ -1023,6 +1194,7 @@ class Polinomial(object):
         literals = []
         fractions = []
         radicals = []
+        pmult = []
         
         mons = [self]
 
@@ -1038,6 +1210,8 @@ class Polinomial(object):
                     mons.append(i)
                 elif isinstance(i, LiteralFraction):
                     fractions.append(i)
+                elif isinstance(i, PolinomialMultiplication):
+                    pmult.append(i)
 
         self.terms.clear()
         
@@ -1091,10 +1265,12 @@ class Polinomial(object):
             else: rout = r
         self.terms.append(rout) if (rout and (isinstance(rout, Radical) and rout.coefficient != 0)) else None
 
+        self.terms += pmult
+
         self.terms.reverse()
 
         if len(self.terms) == 1 and isinstance(self.terms[0], (int, float, Integer)):
-            return Integer(self.terms[0])
+            return Integer(self.terms[0], esponent=self.esponent)
         
         if len(self.terms) == 0:
             self.terms.append(Integer(0))
@@ -1131,8 +1307,10 @@ class Polinomial(object):
     
     def __eq__(self, value):
         if isinstance(value, Polinomial):
-            if self.terms == value.terms: return True
-            else: return False
+            if self.esponent != value.esponent: return False 
+            for i in self:
+                if not i in value.terms: return False
+            return True
         if isinstance(value, Binomial) or value == Binomial:
             return True if len(self.terms) == 2 else False
         elif isinstance(value, Trinomial) or value == Trinomial:
@@ -1146,7 +1324,7 @@ class Polinomial(object):
 
     def __add__(self, value):
 
-        self = Polinomial(terms=self.terms.copy())
+        self = self._caluclate_pow_()
 
         if isinstance(value, str): value = Polinomial.from_string(value)
 
@@ -1182,7 +1360,7 @@ class Polinomial(object):
 
     def __sub__(self, value):
 
-        self = Polinomial(terms=self.terms.copy())
+        self = self._caluclate_pow_()
 
         if isinstance(value, str): value = Polinomial.from_string(value)
 
@@ -1219,27 +1397,36 @@ class Polinomial(object):
     
     def __mul__(self, value):
 
-        self = Polinomial(terms=self.terms.copy())
+        self: Polinomial = Polinomial(terms=self.terms.copy(), esponent=self.esponent)
 
         if isinstance(value, str): value = Polinomial.from_string(value)
         
         if isinstance(value, (Integer, int, float, Fraction, LiteralFraction, Unknow, Literal, Radical)):
-            for i in self.terms:
-                self.terms[self.terms.index(i)] = i * value
-            return self
+            if value == 1:
+                return self
+            elif value == -1:
+                return -self
+            if self.esponent != 1:
+                return PolinomialMultiplication(self, coefficient=value, _keep_type=True)
+            else:
+                for i in self.terms:
+                    self.terms[self.terms.index(i)] = i * value
+                return self
             
-        if isinstance(value, Polinomial):
-            outterms = []
-            for i in self.terms:
-                for t in value.terms.copy():
-                    outterms.append(i*t)
-            return Polinomial(terms=outterms)
+        elif isinstance(value, Polinomial):
+            if self.terms == value.terms:
+                return Polinomial(*value.terms, esponent = self.esponent + value.esponent)
+            else:
+                return PolinomialMultiplication(self, value)
+        
+        elif isinstance(value, PolinomialMultiplication):
+            return value * self
     
     def __rmul__(self, value):
         return self * value
     
     def __truediv__(self, value):
-        self = Polinomial(terms=self.terms.copy())
+        self: Polinomial = Polinomial(terms=self.terms.copy(), esponent=self.esponent)
 
         if isinstance(value, str): value = Polinomial.from_string(value)
         
@@ -1248,7 +1435,7 @@ class Polinomial(object):
                 outterms = []
                 for i in self:
                     outterms.append(i / value)
-                return Polinomial(outterms)
+                return Polinomial(*outterms)
             for i in self.terms:
                 try:
                     if i % value != 0:
@@ -1257,11 +1444,17 @@ class Polinomial(object):
                 self.terms[self.terms.index(i)] = i / value
             return self
 
-        if isinstance(value, Polinomial):
+        elif isinstance(value, Polinomial):
+            if self.terms == value.terms:
+                return Polinomial(*value.terms, esponent = self.esponent - value.esponent)
+            
             qu, rest = divmod(self, value)
             if rest == 0:
                 return qu
-            else: return LiteralFraction(self, value)      
+            else: return LiteralFraction(self, value)
+
+        elif isinstance(value, PolinomialMultiplication):
+            return LiteralFraction(self, value)
 
     def __rtruediv__(self, value):
         return LiteralFraction(value, self)
@@ -1294,16 +1487,21 @@ class Polinomial(object):
         return (quotient, rest)   
 
     def __pow__(self, value):
-
         if isinstance(value, Fraction):
             return Radical(self**value.numerator, value.denominator)
 
-        if self == Binomial and isinstance(value, (int, Integer)):
+        elif isinstance(value, (int, Integer)):
+            return Polinomial(*self.terms, esponent = self.esponent * value)
+
+    def _caluclate_pow_(self):
+
+        if self.esponent == 1: return self
+        if self == Binomial:
             terms = []
             a = self.terms[0]
             b = self.terms[1]
 
-            n = value
+            n = self.esponent
             if isinstance(a, (Unknow, Literal)) and isinstance(b, (Unknow, Literal)):
                 for k in range(0, n+1):
                     coeff = _factorial(n) // _factorial(k) // _factorial(n-k)
@@ -1339,13 +1537,106 @@ class Polinomial(object):
 
             return Polinomial(terms=terms)
         
-        elif len(self.terms) == 1 and isinstance(self.terms[0], UnknownMultiplication):
-            return self.terms[0] ** value
-        
-        else: raise ValueError('Cannot elvate non-binomial to a power or literals powers!')
+        else: 
+            out = self
+            for i in range(self.esponent):
+                out = out * self
+            return Polinomial(*out)
     
     def __iter__(self):
         return iter(self.terms)
+
+class PolinomialMultiplication(object):
+
+    polinomials: List[Polinomial] = None
+    coefficient: int = 1
+
+    def __new__(cls, *polinomials: Tuple[Polinomial], coefficient: int = 1, _keep_type: bool = True) -> PolinomialMultiplication:
+        self = super(PolinomialMultiplication, cls).__new__(cls)
+
+        self.coefficient = coefficient
+        _polinomials = []
+        _processed = []
+        for i in polinomials:
+            if isinstance(i, Polinomial):
+                if not i in _processed:
+                    _polinomials.append(Polinomial(*i, esponent=i.esponent*polinomials.count(i)))
+                    _processed.append(i)
+            else: self.coefficient = self.coefficient * i
+
+        _processed = []
+        self.polinomials = []
+        for p in _polinomials:
+            if not p in _processed:
+                esp = 0
+                _processed.append(p)
+                for i in _polinomials:
+                    if p.terms == i.terms:
+                        esp += i.esponent
+                        _processed.append(i)                       
+                self.polinomials.append(Polinomial(*p, esponent=esp))
+
+        if len(self.polinomials) == 1 and not _keep_type:
+            return self.polinomials[0] * self.coefficient
+        return self
+
+    def __str__(self) -> str:
+        fstr = ''
+        if self.coefficient != 1:
+            fstr += str(self.coefficient)
+        for i in self.polinomials:
+            _str = str(i)
+            if '(' in _str:
+                fstr += _str
+            else: fstr += '('+_str+')'
+
+        return fstr
+    
+    def to_polinomial(self) -> Polinomial:
+        out = 1
+        for i in out:
+            out = out * i
+        return out
+
+    def __add__(self, value):
+        return Polinomial(self, value)
+    
+    def __radd__(self, value):
+        return Polinomial(self, value)
+    
+    def __sub__(self, value):
+        return Polinomial(self, -value)
+    
+    def __rsub__(self, value):
+        return -Polinomial(self, -value)
+    
+    def __mul__(self, value):
+        if isinstance(value, PolinomialMultiplication):
+            return PolinomialMultiplication(*self.polinomials, *value.polinomials, coefficient=self.coefficient*value.coefficient)
+        else: return PolinomialMultiplication(*self.polinomials, value, coefficient=self.coefficient)
+
+    def __rmul__(self, value):
+        return self * value
+    
+    def __truediv__(self, value):
+        _p = list(self)
+        if isinstance(value, Polinomial) and value in _p:
+            pcopy = _p.copy()
+            pcopy.remove(value)
+            return PolinomialMultiplication(*pcopy)
+        elif isinstance(value, PolinomialMultiplication):
+            pcopy = _p.copy()
+            for i in value:
+                if i in _p:
+                    pcopy.remove(i)
+            return PolinomialMultiplication(*pcopy)
+        return LiteralFraction(self, value)
+    
+    def __rtruediv__(self, value):
+        return LiteralFraction(value, self)
+    
+    def __iter__(self):
+        return iter([self.coefficient] + self.polinomials)
 
 class LiteralFraction(object):
 
@@ -1378,15 +1669,22 @@ class LiteralFraction(object):
                 if self.denominator == 1: return self.numerator
                 elif self.denominator == -1: return -self.numerator
 
-                if isinstance(self.numerator, (Unknow, Literal, Polinomial, Radical, UnknownMultiplication)) or \
-                    isinstance(self.denominator, (Unknow, Literal, Polinomial, Radical, UnknownMultiplication)): self.literal = True
+                if isinstance(self.numerator, (Unknow, Literal, Polinomial, Radical, UnknownMultiplication, PolinomialMultiplication)) or \
+                    isinstance(self.denominator, (Unknow, Literal, Polinomial, Radical, UnknownMultiplication, PolinomialMultiplication)): self.literal = True
                 else: return Fraction(int(self.numerator), int(self.denominator))
 
         return self.semplify() if not _avoid_semplification else self
 
     def semplify(self):
-        common = factors(self.numerator, self.denominator)
-        
+        if isinstance(self.numerator, Polinomial):
+            numerator = self.numerator.scompone()
+        else: numerator = self.numerator
+        if isinstance(self.denominator, Polinomial):
+            denominator = self.denominator.scompone()
+        else: denominator = self.denominator
+
+        common = factors(numerator, denominator)
+        self = LiteralFraction(numerator, denominator, _avoid_semplification=True)
         if not common == [1]:
             highest = common[0]
             for i in common[1:]:
@@ -1396,10 +1694,15 @@ class LiteralFraction(object):
                     if i.coefficient > highest: highest = i
                 elif isinstance(i, (Integer, int)) and isinstance(highest, (Unknow, Literal)):
                     if i > highest.coefficient: highest = i
+                elif isinstance(i, Polinomial):
+                    if isinstance(highest, Polinomial) and i.esponent > highest.esponent: highest = i
+                    else: highest = i
                 else:
                     if i > highest: highest = i
 
-            return LiteralFraction(self.numerator / highest, self.denominator / highest, _avoid_semplification=True) if highest != 1 else self
+            return LiteralFraction(numerator / highest, 
+                                   denominator / highest, _avoid_semplification=True) \
+                   if highest != 1 else self
         else: return self
 
     def __neg__(self):
@@ -1423,26 +1726,19 @@ class LiteralFraction(object):
         return False
     
     def __add__(self, value) -> Union[LiteralFraction, Fraction]:
-        self = LiteralFraction(self.numerator, self.denominator)
+        self = LiteralFraction(self.numerator, self.denominator, _avoid_semplification=True)
         if isinstance(value, (LiteralFraction, Fraction)):
-            fn = self.numerator * value.denominator
-            sn = self.denominator * value.numerator
-            commondenominator = self.denominator * value.denominator
-            return LiteralFraction((fn + sn), commondenominator)
+            denominator = MCM(self.denominator, value.denominator)
+            fn = self.numerator * (denominator / value.denominator)
+            sn = value.numerator * (denominator / self.denominator)
+
+            return LiteralFraction((fn + sn), denominator)
         else:
             self.numerator = self.numerator + (self.denominator * value)
         return self
 
     def __sub__(self, value) -> Union[LiteralFraction, Fraction]:
-        self = LiteralFraction(self.numerator, self.denominator)
-        if isinstance(value, (LiteralFraction, Fraction)):
-            fn = self.numerator * value.denominator
-            sn = self.denominator * value.numerator
-            commondenominator = self.denominator * value.denominator
-            return LiteralFraction((fn + sn), commondenominator)
-        else:
-            self.numerator = self.numerator + (self.denominator * value)
-        return self
+        return self.__add__(-value)
     
     def __mul__(self, value):
         if isinstance(value, (LiteralFraction, Fraction)):
@@ -1455,6 +1751,9 @@ class LiteralFraction(object):
         else:
             if self.denominator == value: return self.numerator
             else: return LiteralFraction(self.numerator * value, self.denominator)
+
+    def __rmul__(self, value):
+        return self * value
 
     def __truediv__(self, value):
         self = LiteralFraction(self.numerator, self.denominator)
@@ -1529,8 +1828,9 @@ Current Supported:
         if not equation: equation = self.first
         if isinstance(equation, Equation): equation = equation.first
 
-        umap = {}
+        if isinstance(equation, (int, Integer, Unknow, Literal)): return equation
 
+        umap = {}
         for i in equation:
             if isinstance(i, (Unknow, Literal)):
                 if not i.symbol in umap.keys(): umap[i.symbol] = [i]
@@ -1551,8 +1851,7 @@ Current Supported:
                 else: literals.append(l)
                 bf = l
 
-        literals += others
-        return literals
+        return literals + others
 
     def solve(self, unknow = None):
         if isinstance(self.first, Polinomial) and Unknow in self.first:
@@ -1583,21 +1882,19 @@ Current Supported:
                         _rad = Radical(delta)
                         solutions = [LiteralFraction((_rad -b),(2*a)),
                                     LiteralFraction((-b -_rad),(2*a))]
-
-                        f = Equation(Unknow('x')*solutions[0].denominator - solutions[0].numerator, 0).solve()
-                        s = Equation(Unknow('x')*solutions[1].denominator - solutions[1].numerator, 0).solve()
-
-                        return (f, s)
+                        return tuple(solutions)
+                    
                     elif delta == 0:
                         rv = Equation(Radical(pa)+ Radical(pc), 0).solve()
                         return (rv, rv)
                     else:
                         raise NotImplementedError('Cannot get the square root of a negative number')
+
                 elif len(uk) == 2 and uk[0].symbol == uk[1].symbol \
                     and (uk[0].esponent == 2 and uk[1].esponent == 1) and len(num) == 0:
                     rv = Polinomial(uk)/uk[0].symbol
-                    print(rv)
                     return (0, Equation(rv).solve())
+
                 elif len(uk) == 1:
                     rv = Radical(LiteralFraction(-sum(num), uk[0].coefficient))
                     return (rv, -rv)

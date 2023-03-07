@@ -122,11 +122,7 @@ There is a function called 'factors' that finds common factors between items:
 >>> factors(33, 27)
 [1, 3]
 >>> factors(15*x, 3*x)
-[<Core.types.Unknow object at 0x01886598>, <Core.types.Unknow object at 0x01886FD0>, 1, 3]
-
->>> for i in factors(15*x, 3*x):
-...   print(i, end=', ')
-x, 3x, 1, 3,
+[<Unknow: x>, <Unknow: 3x>, 1, 3]
  
 >>> for i in factors(12*x*y**2, 3*x*y):
 ...   print(i, end=', ')

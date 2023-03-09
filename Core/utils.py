@@ -407,7 +407,7 @@ def factors(*objects: Union[Polinomial, Unknow, Literal, LiteralFraction, Fracti
             return [r.__new__(type(r), i, r.index) for i in factors(r.base)]
         
         if isinstance(item, (int, Integer)): return _number_factors(item)
-        elif type(item).__name__ in ('Unknow', 'Literal'):
+        elif type(item).__name__ in ('Unknow', 'Literal', 'ImaginaryUnit'):
             out = []
             nf = __factors(item.coefficient)
             for i in _literal_factors(item):

@@ -1608,8 +1608,6 @@ Current Supported:
                     if a*i**3 + b*i**2 + c*i + pd == 0:
                         _factors.append(Polinomial(Unknow(pa.symbol), -i))
 
-                _factors = []
-
                 if len(_factors) == 3: return [Equation(e).solve() for e in _factors]
                 elif len(_factors) == 2:
                     _f = 1

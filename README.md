@@ -10,7 +10,7 @@ Import a pre-defined unknown
 ```
 or create your own unknown
 ``` python
->>> from Core import Unknow
+>>> from Core.unknowns import Unknow
 >>> unknown = Unknow('k')
 ```
 Great!
@@ -29,7 +29,7 @@ Now let's do some additions and subtractions:
 ```
 Now we are ready to solve a basic equation!
 ``` python
->>> from Core import Equation
+>>> from Core.equations import Equation
 >>> from Core.simples import x
 >>>
 >>> equation = Equation(2*x, 8) # means "2x = 8"
@@ -42,7 +42,7 @@ When monomials are too easy, here we have Polinomials!
 
 Polinomials are very useful in symbolic math computation!
 ``` python
->>> from Core import Polinomial
+>>> from Core.polinomials import Polinomial
 ```
 Now let's see some basic math with them:
 ``` python
@@ -53,7 +53,7 @@ Now let's see some basic math with them:
 >>> eq = poli - 7*y
 >>> eq
 +3x -4
->>> from Core import Equation
+>>> from Core.equations import Equation
 >>> Equation(eq, 0).solve()
 4/3
 ```
@@ -61,7 +61,7 @@ Now let's see some basic math with them:
 ### Radicals:
 When we have to manage numbers under root, we need the Radical object:
 ``` python
->>> from Core import Radical
+>>> from Core.radicals import Radical
 >>> radical = Radical(3)
 >>> radical
 ²√3
@@ -76,7 +76,7 @@ When we have to manage numbers under root, we need the Radical object:
 ### Factorizzation of numbers:
 The Integer class allows us to see numbers as multiplication of prime numbers:
 ``` python
->>> from Core import Integer
+>>> from Core.integers import Integer
 >>> Integer.factorize(12)
 [2, 2, 3]
 >>> Integer(65).factorize()
@@ -133,7 +133,7 @@ There is a function called 'factors' that finds common factors between items:
 This library can also compute second degree equaitons
 ``` python
 >>> from Core.simples import x
->>> from Core import Equation
+>>> from Core.equations import Equation
 >>> 
 >>> x1, x2 = Equation(x**2 + 4*x +4, 0).solve()
 >>> x1

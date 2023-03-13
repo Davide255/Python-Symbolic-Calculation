@@ -107,6 +107,7 @@ We can also scompone more complex polinomials such as "x² -3x -3":
 1/4
 >>> first_factor * second_factor * coefficient
 +x² -3x -3
+```
 
 ### Find common factors:
 There is a function called 'factors' that finds common factors between items:

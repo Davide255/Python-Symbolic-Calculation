@@ -86,32 +86,27 @@ The Integer class allows us to see numbers as multiplication of prime numbers:
 ### Factorizzation of polinomials:
 As all us know, polinomials can be also be factorized:
 ``` python
->>> first_factor, second_factor = (x**2 + 4*x + 4).scompone()
+>>> first_factor, second_factor, coefficient = (x**2 + 4*x + 4).scompone()
 >>> first_factor
 +x +2
 >>> second_factor 
 +x +2
->>> first_factor * second_factor
+>>> coefficient
+1
+>>> first_factor * second_factor * coefficient
 +x² +4x +4
 ```
 We can also scompone more complex polinomials such as "x² -3x -3":
 ``` python
->>> first_factor, second_factor = (x**2 - 3*x -3).scompone()
+>>> first_factor, second_factor, coefficient = (x**2 - 3*x -3).scompone()
 >>> first_factor
 +2x -3 -1²√21
 >>> second_factor
 +2x -3 +²√21
->>> first_factor * second_factor
-+4x² -12x -12
-```
-As we can see this polinomial isn't reduced, we can search if there is a common divisor between it's terms:
-``` python
->>> mult = first_factor * second_factor
->>> mult.mcd()
-4
->>> mult / mult.mcd()
+>>> coefficient
+1/4
+>>> first_factor * second_factor * coefficient
 +x² -3x -3
-```
 
 ### Find common factors:
 There is a function called 'factors' that finds common factors between items:

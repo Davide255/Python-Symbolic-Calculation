@@ -1,4 +1,4 @@
-from .types import *
+from ._types import Unknow
 
 x = Unknow('x')
 
